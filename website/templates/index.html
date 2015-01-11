@@ -7,22 +7,31 @@
 <body>
     <div id="newsPanel"></div>
     <script src="/static/jquery-1.8.3.js"></script>
+    <script src="/static/socket.io.min.js"></script>
     <script>
-        $.ajax({
-            success: function(result) {
-                console.log(result);
-                var $newsPanel = $('#newsPanel');
-                for (var i = 0; i < result.news.length; i++) {
-                    $newsPanel.html($newsPanel.html() +
-                        '<div>' +
-                            '<h1>' + result.news[i].headline + '</h1>' +
-                            '<h2>' + result.news[i].content + '</h2>' +
-                        '</div>')
-                }
-            },
-            type: 'GET',
-            url: '/news/api/News'
-        })
+        $(document).ready(function() {
+            namespace = '/news'; // change to an empty string to use the global namespace
+            var socket = io.connect('http://' + document.domain + ':' + location.port + namespace);
+            var newsPanel = $('#newsPanel');
+
+            socket.on('connect', function() {
+                socket.emit('my event', {data: 'I\'m connected!'});
+            });
+
+            socket.on('new-news', function(news) {
+                console.log("Got new-news: " + news);
+                appendNews(newsPanel, news);
+            });
+        });
+
+        function appendNews(newsPanel, news) {
+            var newsHtml =
+                    '<div>' +
+                        '<h1>' + news.headline + '</h1>' +
+                        '<h2>' + news.content + '</h2>' +
+                    '</div>';
+            newsPanel.append(newsHtml);
+        }
     </script>
 </body>
 </html>
