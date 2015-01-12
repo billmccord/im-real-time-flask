@@ -1,0 +1,1 @@
+web: gunicorn -w 2 -b "0.0.0.0:$PORT" --error-logfile - --access-logfile - --log-level debug --worker-class socketio.sgunicorn.GeventSocketIOWorker --pythonpath website website:app
