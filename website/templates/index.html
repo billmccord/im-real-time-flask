@@ -10,8 +10,8 @@
     <script src="/static/socket.io.min.js"></script>
     <script>
         $(document).ready(function() {
-            namespace = '/news'; // change to an empty string to use the global namespace
-            var socket = io.connect('http://' + document.domain + ':' + location.port + namespace);
+            var namespace = '/news'; // change to an empty string to use the global namespace
+            var socket = io.connect(location.origin + namespace);
             var newsPanel = $('#newsPanel');
 
             socket.on('connect', function() {
