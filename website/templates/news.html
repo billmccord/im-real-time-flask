@@ -9,6 +9,15 @@
     <script src="/static/jquery-1.8.3.js"></script>
     <script src="/static/eventsource.min.js"></script>
     <script>
+        function appendNews(newsPanel, news) {
+            var newsHtml =
+                    '<div>' +
+                        '<h1>' + news.headline + '</h1>' +
+                        '<h2>' + news.content + '</h2>' +
+                    '</div>';
+            newsPanel.append(newsHtml);
+        }
+
         $(document).ready(function() {
             var newsPanel = $('#newsPanel');
 
@@ -21,15 +30,6 @@
             es.addEventListener("message", listener);
             es.addEventListener("error", listener);
         });
-
-        function appendNews(newsPanel, news) {
-            var newsHtml =
-                    '<div>' +
-                        '<h1>' + news.headline + '</h1>' +
-                        '<h2>' + news.content + '</h2>' +
-                    '</div>';
-            newsPanel.append(newsHtml);
-        }
     </script>
 </body>
 </html>

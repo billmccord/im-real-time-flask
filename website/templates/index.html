@@ -9,6 +9,15 @@
     <script src="/static/jquery-1.8.3.js"></script>
     <script src="/static/socket.io.min.js"></script>
     <script>
+        function appendNews(newsPanel, news) {
+            var newsHtml =
+                    '<div>' +
+                        '<h1>' + news.headline + '</h1>' +
+                        '<h2>' + news.content + '</h2>' +
+                    '</div>';
+            newsPanel.append(newsHtml);
+        }
+
         $(document).ready(function() {
             var namespace = '/news'; // change to an empty string to use the global namespace
             var socket = io.connect(location.origin + namespace);
@@ -23,15 +32,6 @@
                 appendNews(newsPanel, news);
             });
         });
-
-        function appendNews(newsPanel, news) {
-            var newsHtml =
-                    '<div>' +
-                        '<h1>' + news.headline + '</h1>' +
-                        '<h2>' + news.content + '</h2>' +
-                    '</div>';
-            newsPanel.append(newsHtml);
-        }
     </script>
 </body>
 </html>

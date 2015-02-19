@@ -23,7 +23,11 @@ def news():
 
 @app.route('/news-stream')
 def news_stream():
-    return Response(SSEConsumer(news_producer).consume(), mimetype="text/event-stream")
+    headers = dict()
+    headers['Access-Control-Allow-Origin'] = '*'
+    return Response(SSEConsumer(news_producer).consume(),
+                    mimetype="text/event-stream",
+                    headers=headers)
 
 
 @socket_io.on('connect', namespace='/news')
