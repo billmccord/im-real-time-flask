@@ -1,10 +1,10 @@
-import threading
-from time import strftime, sleep
-from flask import Flask, render_template, Response, json
+from flask import Flask, render_template, Response
 from flask.ext.socketio import SocketIO
 from werkzeug._internal import _log
 import news
-
+from news_producer import NewsProducer
+from socket_broadcast_consumer import SocketBroadcastConsumer
+from sse_consumer import SSEConsumer
 
 app = Flask(__name__)
 socket_io = SocketIO(app)
@@ -23,56 +23,18 @@ def news():
 
 @app.route('/news-stream')
 def news_stream():
-    return Response(generate_news_stream(), mimetype="text/event-stream")
-
-
-def generate_news_stream():
-    news_count = 0
-    while True:
-        news_count += 1
-        _log('info', 'Streaming news')
-        yield 'data: %s\n\n' % json.dumps(generate_news(news_count))
-        _log('info', 'Sleeping')
-        sleep(5)
-        _log('info', 'Woke up')
+    return Response(SSEConsumer(news_producer).consume(), mimetype="text/event-stream")
 
 
 @socket_io.on('connect', namespace='/news')
 def test_connect():
-    emit_news(0)
+    if not socket_broadcast_consumer.isAlive():
+        socket_broadcast_consumer.start()
 
 
-def news_thread():
-    news_count = 0
-    while True:
-        news_count += 1
-        emit_news(news_count)
-        _log('info', 'Sleeping')
-        sleep(5)
-        _log('info', 'Woke up')
-
-
-def emit_news(news_count):
-    _log('info', 'Generating news')
-    new_news = generate_news(news_count)
-    _log('info', 'Emitting news: %s' % new_news)
-    socket_io.emit('new-news', new_news, namespace='/news')
-
-
-def generate_news(news_count):
-    return \
-        {
-            "content": "The content for the news story %d." % (++news_count),
-            "date": strftime('%Y/%m/%d'),
-            "headline": "News story %d" % news_count,
-            "icon": "",
-            "source": "Source %d" % news_count
-        }
-
-_log('info', 'Creating news thread')
-t = threading.Thread(target=news_thread)
-t.daemon = True
-t.start()
+news_producer = NewsProducer()
+news_producer.start()
+socket_broadcast_consumer = SocketBroadcastConsumer(socket_io, news_producer)
 
 if __name__ == '__main__':
     _log('info', 'Starting app')
