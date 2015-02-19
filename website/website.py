@@ -1,7 +1,6 @@
 import threading
 from time import strftime, sleep
-from flask import Flask
-from flask import render_template
+from flask import Flask, render_template, Response, json
 from flask.ext.socketio import SocketIO
 from werkzeug._internal import _log
 import news
@@ -15,6 +14,27 @@ app.register_blueprint(news.newsBluePrint, url_prefix='/news')
 @app.route('/')
 def hello_world():
     return render_template("index.html")
+
+
+@app.route('/news')
+def news():
+    return render_template("news.html")
+
+
+@app.route('/news-stream')
+def news_stream():
+    return Response(generate_news_stream(), mimetype="text/event-stream")
+
+
+def generate_news_stream():
+    news_count = 0
+    while True:
+        news_count += 1
+        _log('info', 'Streaming news')
+        yield 'data: %s\n\n' % json.dumps(generate_news(news_count))
+        _log('info', 'Sleeping')
+        sleep(5)
+        _log('info', 'Woke up')
 
 
 @socket_io.on('connect', namespace='/news')
