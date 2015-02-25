@@ -46,7 +46,7 @@ class ProcessorBase(object):
 
     @abstractmethod
     def process(self):
-        """Process items."""
+        """Process items from the queue."""
 
 
 class SSEStreamer(ProcessorBase):

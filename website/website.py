@@ -1,7 +1,7 @@
 from flask import Flask, render_template, Response
 from flask.ext.socketio import SocketIO
 from werkzeug._internal import _log
-from news_producer import NewsProducer
+from producer import NewsProducer
 from processor import SocketBroadcaster
 from processor import SSEStreamer
 from news import newsBluePrint
