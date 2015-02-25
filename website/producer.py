@@ -55,28 +55,33 @@ class ProducerBase(object):
         blocking."""
 
 
-class NewsProducer(ProducerBase, Thread):
-    def __init__(self):
-        super(NewsProducer, self).__init__()
+class SimpleQueueProducer(ProducerBase):
+    """A producer for the Queue implementation."""
+    def __init__(self, block=True, timeout=None):
+        super(SimpleQueueProducer, self).__init__()
+        self.block = block
+        self.timeout = timeout
+
+    def _put(self, item, queue):
+        queue.put(item, self.block, self.timeout)
+
+
+class NewsProducer(SimpleQueueProducer, Thread):
+    def __init__(self, *args, **kwargs):
+        super(NewsProducer, self).__init__(*args, **kwargs)
         self.news_count = 0
         self.stop_request = Event()
 
-    def _put(self, item, queue):
-        queue.put(item)
-
     def run(self):
-        while not self.stop_request.isSet():
+        while not self.stop_request.isSet() and self.news_count < 10:
             if self.queue_count > 0:
                 self.news_count += 1
-                if self.news_count > 10:
-                    _log('info', 'Sending poison pill!')
-                    self.poison()
-                    self.news_count = 0
-                else:
-                    _log('info', 'Producing news: %d' % self.news_count)
-                    item = self.generate_news(self.news_count)
-                    self.produce(item)
+                _log('info', 'Producing news: %d' % self.news_count)
+                item = self.generate_news(self.news_count)
+                self.produce(item)
             sleep(2)
+        _log('info', 'Sending poison pill!')
+        self.poison()
 
     def join(self, timeout=None):
         self.stop_request.set()

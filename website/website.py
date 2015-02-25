@@ -10,8 +10,7 @@ app = Flask(__name__)
 socket_io = SocketIO(app)
 app.register_blueprint(newsBluePrint, url_prefix='/news')
 socket_broadcaster = None
-news_producer = NewsProducer()
-news_producer.start()
+news_producer = None
 
 
 @app.route('/')
@@ -28,7 +27,7 @@ def news():
 def news_stream():
     headers = dict()
     headers['Access-Control-Allow-Origin'] = '*'
-    return Response(SSEStreamer(news_producer).process(),
+    return Response(SSEStreamer(get_news_producer()).process(),
                     mimetype="text/event-stream",
                     headers=headers)
 
@@ -38,8 +37,16 @@ def test_connect():
     global socket_broadcaster
     if socket_broadcaster is None or not socket_broadcaster.isAlive():
         socket_broadcaster = SocketBroadcaster(
-            socket_io, news_producer, 'new-news', namespace='/news')
+            socket_io, get_news_producer(), 'new-news', namespace='/news')
         socket_broadcaster.start()
+
+
+def get_news_producer():
+    global news_producer
+    if news_producer is None or not news_producer.isAlive():
+        news_producer = NewsProducer()
+        news_producer.start()
+    return news_producer
 
 
 if __name__ == '__main__':
