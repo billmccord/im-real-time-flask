@@ -35,7 +35,7 @@
             var namespace = '/news'; // change to an empty string to use the global namespace
             var newsPanel = $('#newsPanel');
             console.log("Socket connecting!");
-            var socket = io.connect('http://' + document.domain + ':' + location.port + namespace);
+            var socket = io.connect(window.location.protocol + '//' + document.domain + ':' + location.port + namespace);
 
             socket.on('connect', function() {
                 console.log("Socket connected!");
