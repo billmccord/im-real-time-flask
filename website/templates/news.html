@@ -22,13 +22,38 @@
             var newsPanel = $('#newsPanel');
 
             var es = new EventSource("news-stream");
-            var listener = function (event) {
-                console.log("Got new-news: " + event.data);
-                appendNews(newsPanel, JSON.parse(event.data));
-            };
-            es.addEventListener("open", listener);
-            es.addEventListener("message", listener);
-            es.addEventListener("error", listener);
+
+            es.addEventListener("open", function () {
+                console.log("EventSource Opened!");
+            });
+
+            es.addEventListener('close', function() {
+                console.log("EventSource Closed!");
+                es.close();
+            });
+
+            es.addEventListener("message", function (e) {
+				if (!e) {
+                    console.log("Empty Event, Closing EventSource!");
+					es.close();
+				} else if (e.target.readyState === EventSource.CLOSED) {
+                    console.log("Ready State Closed, Closing EventSource!");
+					es.close();
+				} else if (e.id === 'CLOSE') {
+                    console.log("Event id == CLOSE, Closing EventSource!");
+					es.close();
+				}
+				else {
+                    console.log("Got new-news: " + e.data);
+					var data = JSON.parse(e.data);
+                    appendNews(newsPanel, data);
+				}
+            });
+
+            es.addEventListener("error", function () {
+                console.log("EventSource Error, Closing EventSource!");
+                es.close();
+            });
         });
     </script>
 </body>

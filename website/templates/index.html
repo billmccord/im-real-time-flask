@@ -28,7 +28,7 @@
             });
 
             socket.on('new-news', function(news) {
-                console.log("Got new-news: " + news);
+                console.log("Got new-news: " + news.headline);
                 appendNews(newsPanel, news);
             });
         });

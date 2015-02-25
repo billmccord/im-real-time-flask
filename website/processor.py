@@ -1,0 +1,96 @@
+from abc import ABCMeta, abstractmethod
+from contextlib import contextmanager
+from threading import Event, Thread
+from consumer import SimpleQueueConsumer
+from consumer import EmptyTimeoutQueueConsumer
+from flask import json
+
+
+class ProcessorBase(object):
+    __metaclass__ = ABCMeta
+
+    def __init__(self, producer, consumer):
+        super(ProcessorBase, self).__init__()
+        self._producer = producer
+        self._consumer = consumer
+
+    @property
+    def is_finished(self):
+        """Are we finished? Default to False / infinite processing.
+        Can override for more specific behavior."""
+        return False
+
+    def _consume(self):
+        """Generator for getting consumed items to process."""
+        with self._connected():
+            while not self.is_finished:
+                item = self._consumer.consume()
+                if self.is_poison(item):
+                    break
+                yield item
+
+    @contextmanager
+    def _connected(self):
+        """Context for managing consumer queue connection to producer."""
+        self._producer.add_queue(self._consumer.queue)
+        try:
+            yield
+        finally:
+            self._producer.remove_queue(self._consumer.queue)
+
+    @abstractmethod
+    def is_poison(self, item):
+        """Is the specified item poison? By default, None is poison, but
+        this can be overridden."""
+        return item is None
+
+    @abstractmethod
+    def process(self):
+        """Process items."""
+
+
+class SSEStreamer(ProcessorBase):
+    def __init__(self, producer):
+        super(SSEStreamer, self).__init__(producer, SimpleQueueConsumer(1))
+
+    def is_poison(self, item):
+        return super(SSEStreamer, self).is_poison(item)
+
+    def process(self):
+        for item in self._consume():
+            yield 'data: %s\n\n' % json.dumps(item)
+        yield 'event: close\nid: CLOSE\ndata: \n\n'
+
+
+class SocketBroadcaster(ProcessorBase, Thread):
+    def __init__(self, socket_io, producer, event, *args, **kwargs):
+        super(SocketBroadcaster, self).__init__(
+            producer, EmptyTimeoutQueueConsumer(1))
+        self.socket_io = socket_io
+        self.event = event
+        self.args = args
+        self.kwargs = kwargs
+        self.stop_request = Event()
+
+    @property
+    def is_finished(self):
+        return self.stop_request.isSet()
+
+    def is_poison(self, item):
+        if self._consumer.had_timeout:
+            return False
+        return super(SocketBroadcaster, self).is_poison(item)
+
+    def process(self):
+        for item in self._consume():
+            if self._consumer.had_timeout:
+                # If there was a timeout, skip over the emit.
+                continue
+            self.socket_io.emit(self.event, item, *self.args, **self.kwargs)
+
+    def run(self):
+        self.process()
+
+    def join(self, timeout=None):
+        self.stop_request.set()
+        super(SocketBroadcaster, self).join(timeout)
