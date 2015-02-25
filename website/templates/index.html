@@ -2,13 +2,15 @@
 <html>
 <head lang="en">
     <meta charset="UTF-8">
-    <title></title>
+    <title>Socket Flask</title>
 </head>
 <body>
     <div id="newsPanel"></div>
     <script src="/static/jquery-1.8.3.js"></script>
     <script src="/static/socket.io.min.js"></script>
     <script>
+        WEB_SOCKET_SWF_LOCATION = "/static/WebSocketMain.swf";
+
         function appendNews(newsPanel, news) {
             var newsHtml =
                     '<div>' +
@@ -20,10 +22,12 @@
 
         $(document).ready(function() {
             var namespace = '/news'; // change to an empty string to use the global namespace
-            var socket = io.connect(location.origin + namespace);
             var newsPanel = $('#newsPanel');
+            console.log("Socket connecting!");
+            var socket = io.connect('http://' + document.domain + ':' + location.port + namespace);
 
             socket.on('connect', function() {
+                console.log("Socket connected!");
                 socket.emit('my event', {data: 'I\'m connected!'});
             });
 
