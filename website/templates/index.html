@@ -11,6 +11,17 @@
     <script>
         WEB_SOCKET_SWF_LOCATION = "/static/WebSocketMain.swf";
 
+        // IE9 can't handle console messages...
+        if(!(window.console && console.log)) {
+          console = {
+            log: function(){},
+            debug: function(){},
+            info: function(){},
+            warn: function(){},
+            error: function(){}
+          };
+        }
+
         function appendNews(newsPanel, news) {
             var newsHtml =
                     '<div>' +
