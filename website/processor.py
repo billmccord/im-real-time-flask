@@ -1,12 +1,15 @@
 from abc import ABCMeta, abstractmethod
 from contextlib import contextmanager
 from threading import Event, Thread
+
+from flask import json
+
 from consumer import SimpleQueueConsumer
 from consumer import EmptyTimeoutQueueConsumer
-from flask import json
 
 
 class ProcessorBase(object):
+    """An abstract processor."""
     __metaclass__ = ABCMeta
 
     def __init__(self, producer, consumer):
@@ -16,8 +19,7 @@ class ProcessorBase(object):
 
     @property
     def is_finished(self):
-        """Are we finished? Default to False / infinite processing.
-        Can override for more specific behavior."""
+        """Are we finished? Default to False / infinite processing."""
         return False
 
     def _consume(self):
@@ -40,8 +42,7 @@ class ProcessorBase(object):
 
     @abstractmethod
     def is_poison(self, item):
-        """Is the specified item poison? By default, None is poison, but
-        this can be overridden."""
+        """Is the specified item poison? By default, None is poison."""
         return item is None
 
     @abstractmethod
@@ -50,6 +51,7 @@ class ProcessorBase(object):
 
 
 class SSEStreamer(ProcessorBase):
+    """A simple server-sent events streamer."""
     def __init__(self, producer):
         super(SSEStreamer, self).__init__(producer, SimpleQueueConsumer(1))
 
@@ -63,6 +65,7 @@ class SSEStreamer(ProcessorBase):
 
 
 class SocketBroadcaster(ProcessorBase, Thread):
+    """A simple socket broadcaster."""
     def __init__(self, socket_io, producer, event, *args, **kwargs):
         super(SocketBroadcaster, self).__init__(
             producer, EmptyTimeoutQueueConsumer(1))
@@ -74,9 +77,11 @@ class SocketBroadcaster(ProcessorBase, Thread):
 
     @property
     def is_finished(self):
+        # We are finished if the thread was stopped.
         return self.stop_request.isSet()
 
     def is_poison(self, item):
+        # It is only poison if it wasn't the result of a timeout.
         if self._consumer.had_timeout:
             return False
         return super(SocketBroadcaster, self).is_poison(item)

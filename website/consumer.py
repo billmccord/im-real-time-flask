@@ -12,6 +12,7 @@ class ConsumerBase(object):
 
     @property
     def queue(self):
+        """Get the consumer queue."""
         return self._queue
 
     @abstractmethod

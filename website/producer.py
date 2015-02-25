@@ -1,11 +1,9 @@
 from abc import ABCMeta, abstractmethod
-from threading import Lock, Thread, Event
-from werkzeug._internal import _log
-from time import sleep, strftime
+from threading import Lock
 
 
 class ProducerBase(object):
-    """An abstract base class for producers that is thread-safe."""
+    """An abstract, thread-safe producer."""
     __metaclass__ = ABCMeta
 
     def __init__(self):
@@ -27,6 +25,7 @@ class ProducerBase(object):
 
     @property
     def queue_count(self):
+        """Get a count of the queues."""
         with self.mutex:
             return len(self.queues)
 
@@ -56,7 +55,7 @@ class ProducerBase(object):
 
 
 class SimpleQueueProducer(ProducerBase):
-    """A producer for the Queue implementation."""
+    """A producer for a basic Queue implementation."""
     def __init__(self, block=True, timeout=None):
         super(SimpleQueueProducer, self).__init__()
         self.block = block
@@ -64,36 +63,3 @@ class SimpleQueueProducer(ProducerBase):
 
     def _put(self, item, queue):
         queue.put(item, self.block, self.timeout)
-
-
-class NewsProducer(SimpleQueueProducer, Thread):
-    def __init__(self, *args, **kwargs):
-        super(NewsProducer, self).__init__(*args, **kwargs)
-        self.news_count = 0
-        self.stop_request = Event()
-
-    def run(self):
-        while not self.stop_request.isSet() and self.news_count < 10:
-            if self.queue_count > 0:
-                self.news_count += 1
-                _log('info', 'Producing news: %d' % self.news_count)
-                item = self.generate_news(self.news_count)
-                self.produce(item)
-            sleep(2)
-        _log('info', 'Sending poison pill!')
-        self.poison()
-
-    def join(self, timeout=None):
-        self.stop_request.set()
-        super(NewsProducer, self).join(timeout)
-
-    @staticmethod
-    def generate_news(news_count):
-        return \
-            {
-                "content": "The content for the news story %d." % (++news_count),
-                "date": strftime('%Y/%m/%d'),
-                "headline": "News story %d" % news_count,
-                "icon": "",
-                "source": "Source %d" % news_count
-            }

@@ -1,16 +1,19 @@
 from flask import Flask, render_template, Response
 from flask.ext.socketio import SocketIO
-from werkzeug._internal import _log
-from producer import NewsProducer
+
+from producer import SimpleQueueProducer
 from processor import SocketBroadcaster
 from processor import SSEStreamer
 from news import newsBluePrint
+from generator import NewsGenerator
+
 
 app = Flask(__name__)
 socket_io = SocketIO(app)
 app.register_blueprint(newsBluePrint, url_prefix='/news')
 socket_broadcaster = None
-news_producer = None
+simple_producer = SimpleQueueProducer()
+news_generator = None
 
 
 @app.route('/')
@@ -27,7 +30,8 @@ def news():
 def news_stream():
     headers = dict()
     headers['Access-Control-Allow-Origin'] = '*'
-    return Response(SSEStreamer(get_news_producer()).process(),
+    refresh_news_producer()
+    return Response(SSEStreamer(simple_producer).process(),
                     mimetype="text/event-stream",
                     headers=headers)
 
@@ -36,19 +40,18 @@ def news_stream():
 def test_connect():
     global socket_broadcaster
     if socket_broadcaster is None or not socket_broadcaster.isAlive():
+        refresh_news_producer()
         socket_broadcaster = SocketBroadcaster(
-            socket_io, get_news_producer(), 'new-news', namespace='/news')
+            socket_io, simple_producer, 'new-news', namespace='/news')
         socket_broadcaster.start()
 
 
-def get_news_producer():
-    global news_producer
-    if news_producer is None or not news_producer.isAlive():
-        news_producer = NewsProducer()
-        news_producer.start()
-    return news_producer
+def refresh_news_producer():
+    global news_generator
+    if news_generator is None or not news_generator.isAlive():
+        news_generator = NewsGenerator(simple_producer)
+        news_generator.start()
 
 
 if __name__ == '__main__':
-    _log('info', 'Starting app')
     socket_io.run(app)
