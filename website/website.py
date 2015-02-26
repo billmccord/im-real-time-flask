@@ -56,4 +56,6 @@ def refresh_news_producer():
         news_generator = NewsGenerator(simple_producer)
         news_generator.start()
 
-socket_io.run(app, transports=['xhr-polling', 'websocket'])
+
+if __name__ == '__main__':
+    socket_io.run(app)
