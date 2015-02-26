@@ -87,6 +87,9 @@ class SocketBroadcaster(ProcessorBase, Thread):
         return super(SocketBroadcaster, self).is_poison(item)
 
     def process(self):
+        self.start()
+
+    def _process(self):
         for item in self._consume():
             if self._consumer.had_timeout:
                 # If there was a timeout, skip over the emit.
@@ -94,7 +97,7 @@ class SocketBroadcaster(ProcessorBase, Thread):
             self.socket_io.emit(self.event, item, *self.args, **self.kwargs)
 
     def run(self):
-        self.process()
+        self._process()
 
     def join(self, timeout=None):
         self.stop_request.set()

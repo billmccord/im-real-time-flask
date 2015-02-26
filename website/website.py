@@ -47,7 +47,7 @@ def test_connect():
         refresh_news_producer()
         socket_broadcaster = SocketBroadcaster(
             socket_io, simple_producer, 'new-news', namespace='/news')
-        socket_broadcaster.start()
+        socket_broadcaster.process()
 
 
 def refresh_news_producer():
