@@ -1,1 +1,1 @@
-web: gunicorn --worker-class socketio.sgunicorn.GeventSocketIOWorker --pythonpath website website:app
+web: gunicorn --worker-class server.CustomGeventSocketIOWorker --pythonpath website website:app
