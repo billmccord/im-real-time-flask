@@ -1,5 +1,6 @@
 from flask import Flask, render_template, Response
 from flask.ext.socketio import SocketIO
+from gevent import monkey
 
 from producer import SimpleQueueProducer
 from processor import SocketBroadcaster
@@ -7,6 +8,9 @@ from processor import SSEStreamer
 from news import newsBluePrint
 from generator import NewsGenerator
 
+# Make sockets use gevent:
+# http://www.gevent.org/intro.html
+monkey.patch_socket()
 
 app = Flask(__name__)
 socket_io = SocketIO(app)
