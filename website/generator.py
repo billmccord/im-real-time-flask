@@ -1,16 +1,26 @@
-from threading import Thread, Event
+from threading import Thread, Event, Lock
 from time import sleep, strftime
 
 
-class NewsGenerator(Thread):
+class NewsGenerator(object):
     """A simple, example news generator."""
     def __init__(self, producer):
         super(NewsGenerator, self).__init__()
         self.news_count = 0
         self.producer = producer
+        self.mutex = Lock()
+        self.thread = None
         self.stop_request = Event()
 
-    def run(self):
+    def generate(self):
+        with self.mutex:
+            if self.thread is None or not self.thread.isAlive():
+                self.stop_request.clear()
+                self.news_count = 0
+                self.thread = Thread(target=self._generate)
+                self.thread.start()
+
+    def _generate(self):
         # 10 news articles are always generated regardless of who is listening.
         # We could make this more complex and only generate if someone is
         # listening, but most likely the generator wouldn't even be created
@@ -27,9 +37,11 @@ class NewsGenerator(Thread):
         # exit the thread.
         self.producer.poison()
 
-    def join(self, timeout=None):
-        self.stop_request.set()
-        super(NewsGenerator, self).join(timeout)
+    def abort(self, timeout=None):
+        with self.mutex:
+            if self.thread and self.thread.isAlive():
+                self.stop_request.set()
+                self.thread.join(timeout)
 
     @staticmethod
     def generate_news(news_count):

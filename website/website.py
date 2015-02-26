@@ -15,9 +15,10 @@ monkey.patch_socket()
 app = Flask(__name__)
 socket_io = SocketIO(app)
 app.register_blueprint(newsBluePrint, url_prefix='/news')
-socket_broadcaster = None
 simple_producer = SimpleQueueProducer()
-news_generator = None
+socket_broadcaster = SocketBroadcaster(socket_io, simple_producer, 'new-news',
+                                       namespace='/news')
+news_generator = NewsGenerator(simple_producer)
 
 
 @app.route('/')
@@ -34,7 +35,7 @@ def news():
 def news_stream():
     headers = dict()
     headers['Access-Control-Allow-Origin'] = '*'
-    refresh_news_producer()
+    news_generator.generate()
     return Response(SSEStreamer(simple_producer).process(),
                     mimetype="text/event-stream",
                     headers=headers)
@@ -42,19 +43,8 @@ def news_stream():
 
 @socket_io.on('connect', namespace='/news')
 def test_connect():
-    global socket_broadcaster
-    if socket_broadcaster is None or not socket_broadcaster.isAlive():
-        refresh_news_producer()
-        socket_broadcaster = SocketBroadcaster(
-            socket_io, simple_producer, 'new-news', namespace='/news')
-        socket_broadcaster.process()
-
-
-def refresh_news_producer():
-    global news_generator
-    if news_generator is None or not news_generator.isAlive():
-        news_generator = NewsGenerator(simple_producer)
-        news_generator.start()
+    news_generator.generate()
+    socket_broadcaster.process()
 
 
 if __name__ == '__main__':

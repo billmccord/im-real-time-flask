@@ -1,6 +1,6 @@
 from abc import ABCMeta, abstractmethod
 from contextlib import contextmanager
-from threading import Event, Thread
+from threading import Event, Thread, Lock
 
 from flask import json
 
@@ -49,9 +49,19 @@ class ProcessorBase(object):
     def process(self):
         """Process items from the queue."""
 
+    @abstractmethod
+    def abort(self, timeout=None):
+        """Abort processing if possible and block for the specified timeout.
+        Typically a processor should end normally or throw an exception if
+        it is unable to end by the timeout time (see the join method on a
+        Thread.) The default timeout is None which will block forward.
+        By default this does method nothing."""
+        pass
+
 
 class SSEStreamer(ProcessorBase):
     """A simple server-sent events streamer."""
+
     def __init__(self, producer):
         super(SSEStreamer, self).__init__(producer, SimpleQueueConsumer(1))
 
@@ -63,8 +73,11 @@ class SSEStreamer(ProcessorBase):
             yield 'data: %s\n\n' % json.dumps(item)
         yield 'event: close\nid: CLOSE\ndata: \n\n'
 
+    def abort(self, timeout=None):
+        super(SSEStreamer, self).abort(timeout)
 
-class SocketBroadcaster(ProcessorBase, Thread):
+
+class SocketBroadcaster(ProcessorBase):
     """A simple socket broadcaster."""
     def __init__(self, socket_io, producer, event, *args, **kwargs):
         super(SocketBroadcaster, self).__init__(
@@ -73,6 +86,8 @@ class SocketBroadcaster(ProcessorBase, Thread):
         self.event = event
         self.args = args
         self.kwargs = kwargs
+        self.mutex = Lock()
+        self.thread = None
         self.stop_request = Event()
 
     @property
@@ -87,7 +102,11 @@ class SocketBroadcaster(ProcessorBase, Thread):
         return super(SocketBroadcaster, self).is_poison(item)
 
     def process(self):
-        self.start()
+        with self.mutex:
+            if self.thread is None or not self.thread.isAlive():
+                self.stop_request.clear()
+                self.thread = Thread(target=self._process)
+                self.thread.start()
 
     def _process(self):
         for item in self._consume():
@@ -96,9 +115,8 @@ class SocketBroadcaster(ProcessorBase, Thread):
                 continue
             self.socket_io.emit(self.event, item, *self.args, **self.kwargs)
 
-    def run(self):
-        self._process()
-
-    def join(self, timeout=None):
-        self.stop_request.set()
-        super(SocketBroadcaster, self).join(timeout)
+    def abort(self, timeout=None):
+        with self.mutex:
+            if self.thread and self.thread.isAlive():
+                self.stop_request.set()
+                self.thread.join(timeout)
