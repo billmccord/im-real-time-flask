@@ -58,4 +58,4 @@ def refresh_news_producer():
 
 
 if __name__ == '__main__':
-    socket_io.run(app, transports='xhr-polling')
+    socket_io.run(app, transports=('xhr-polling'))
