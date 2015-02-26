@@ -1,1 +1,1 @@
-web: gunicorn --worker-class socketio.sgunicorn.GeventSocketIOWorker --pythonpath website website:app
+web: gunicorn -c website/gunicorn_config.py --pythonpath website website:app
