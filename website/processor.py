@@ -1,8 +1,10 @@
 from abc import ABCMeta, abstractmethod
 from contextlib import contextmanager
-from threading import Event, Thread, Lock
 
 from flask import json
+import gevent
+from gevent.event import Event
+from gevent.lock import RLock
 
 from consumer import SimpleQueueConsumer
 from consumer import EmptyTimeoutQueueConsumer
@@ -64,17 +66,38 @@ class SSEStreamer(ProcessorBase):
 
     def __init__(self, producer):
         super(SSEStreamer, self).__init__(producer, SimpleQueueConsumer(1))
+        self._aborted = False
 
     def is_poison(self, item):
         return super(SSEStreamer, self).is_poison(item)
 
     def process(self):
-        for item in self._consume():
-            yield 'data: %s\n\n' % json.dumps(item)
-        yield 'event: close\nid: CLOSE\ndata: \n\n'
+        self._aborted = False
+        try:
+            for item in self._consume():
+                yield 'data: %s\n\n' % json.dumps(item)
+            yield 'event: close\nid: CLOSE\ndata: \n\n'
+        except GeneratorExit:
+            # Typically caused by client disconnect. Unfortunately, an
+            # exception is currently thrown when this happens. A known bug:
+            # https://github.com/gevent/gevent/issues/445
+            #
+            # Here is a workaround if we really need it:
+            # http://stackoverflow.com/questions/15479902/flask-server-sent-events-socket-exception
+            self._aborted = True
+        finally:
+            self._finished()
 
     def abort(self, timeout=None):
         super(SSEStreamer, self).abort(timeout)
+
+    def _finished(self):
+        """An event that indicates we are finished processing. If aborted is
+        True it means some exception occurred which is typically caused by a
+        client disconnecting. Otherwise, it finished because there were no
+        more items to consume. This should be overridden for custom handling.
+        """
+        print "Finished, aborted = ", self._aborted
 
 
 class SocketBroadcaster(ProcessorBase):
@@ -86,14 +109,14 @@ class SocketBroadcaster(ProcessorBase):
         self.event = event
         self.args = args
         self.kwargs = kwargs
-        self.mutex = Lock()
+        self.mutex = RLock()
         self.thread = None
         self.stop_request = Event()
 
     @property
     def is_finished(self):
         # We are finished if the thread was stopped.
-        return self.stop_request.isSet()
+        return self.stop_request.is_set()
 
     def is_poison(self, item):
         # It is only poison if it wasn't the result of a timeout.
@@ -103,10 +126,9 @@ class SocketBroadcaster(ProcessorBase):
 
     def process(self):
         with self.mutex:
-            if self.thread is None or not self.thread.isAlive():
+            if self.thread is None or self.thread.dead:
                 self.stop_request.clear()
-                self.thread = Thread(target=self._process)
-                self.thread.start()
+                self.thread = gevent.spawn(self._process)
 
     def _process(self):
         for item in self._consume():
@@ -117,6 +139,6 @@ class SocketBroadcaster(ProcessorBase):
 
     def abort(self, timeout=None):
         with self.mutex:
-            if self.thread and self.thread.isAlive():
+            if self.thread and not self.thread.dead:
                 self.stop_request.set()
                 self.thread.join(timeout)

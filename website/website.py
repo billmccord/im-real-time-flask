@@ -35,14 +35,18 @@ def news():
 def news_stream():
     headers = dict()
     headers['Access-Control-Allow-Origin'] = '*'
-    news_generator.generate()
-    return Response(SSEStreamer(simple_producer).process(),
+    # Always generate a unique producer and generator for SSEs.
+    unique_producer = SimpleQueueProducer()
+    unique_news_generator = NewsGenerator(unique_producer)
+    unique_news_generator.generate()
+    return Response(SSEStreamer(unique_producer).process(),
                     mimetype="text/event-stream",
                     headers=headers)
 
 
 @socket_io.on('connect', namespace='/news')
 def test_connect():
+    # Reuse the same generator for broadcast events.
     news_generator.generate()
     socket_broadcaster.process()
 

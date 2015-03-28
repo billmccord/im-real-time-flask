@@ -1,5 +1,5 @@
 from abc import ABCMeta, abstractmethod
-from threading import Lock
+from gevent.lock import RLock
 
 
 class ProducerBase(object):
@@ -10,7 +10,7 @@ class ProducerBase(object):
         super(ProducerBase, self).__init__()
         # mutex must be held whenever the queues are mutating. All methods
         # that acquire mutex must release it before returning.
-        self.mutex = Lock()
+        self.mutex = RLock()
         self.queues = list()
 
     def add_queue(self, queue):
