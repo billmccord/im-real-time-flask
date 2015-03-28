@@ -66,13 +66,14 @@ class SSEStreamer(ProcessorBase):
 
     def __init__(self, producer):
         super(SSEStreamer, self).__init__(producer, SimpleQueueConsumer(1))
-        self._aborted = False
+        # You may optionally specify a method to call when finished or aborted.
+        self.finished = None
+        self.aborted = None
 
     def is_poison(self, item):
         return super(SSEStreamer, self).is_poison(item)
 
     def process(self):
-        self._aborted = False
         try:
             for item in self._consume():
                 yield 'data: %s\n\n' % json.dumps(item)
@@ -84,20 +85,14 @@ class SSEStreamer(ProcessorBase):
             #
             # Here is a workaround if we really need it:
             # http://stackoverflow.com/questions/15479902/flask-server-sent-events-socket-exception
-            self._aborted = True
+            if self.aborted is not None:
+                self.aborted()
         finally:
-            self._finished()
+            if self.finished is not None:
+                self.finished()
 
     def abort(self, timeout=None):
         super(SSEStreamer, self).abort(timeout)
-
-    def _finished(self):
-        """An event that indicates we are finished processing. If aborted is
-        True it means some exception occurred which is typically caused by a
-        client disconnecting. Otherwise, it finished because there were no
-        more items to consume. This should be overridden for custom handling.
-        """
-        print "Finished, aborted = ", self._aborted
 
 
 class SocketBroadcaster(ProcessorBase):

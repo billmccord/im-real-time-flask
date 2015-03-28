@@ -39,9 +39,20 @@ def news_stream():
     unique_producer = SimpleQueueProducer()
     unique_news_generator = NewsGenerator(unique_producer)
     unique_news_generator.generate()
-    return Response(SSEStreamer(unique_producer).process(),
+    streamer = SSEStreamer(unique_producer)
+    streamer.finished = streaming_finished
+    streamer.aborted = streaming_aborted
+    return Response(streamer.process(),
                     mimetype="text/event-stream",
                     headers=headers)
+
+
+def streaming_finished():
+    print "Streaming Finished"
+
+
+def streaming_aborted():
+    print "Streaming Aborted"
 
 
 @socket_io.on('connect', namespace='/news')
